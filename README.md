@@ -1,5 +1,4 @@
 # BandpassFilter-VHDL
-Desing and development of a sixth order bandpass filter using VHDL
 
 ## Goal
 VHDL implementation of a IIR digital filter on FPGA board with the following specs :
@@ -15,5 +14,6 @@ The structure to follow is reported here :
 The tools used to reach the goal are :
 - Matlab : used to calculate coefficients of the lattice-ladder structure and to approximate coefficients
 - Simulink : used to simulate the filter and determine internal signals size
-- VHDL : used for testbench and for the implementation of the filter
+- Quartus Prime : used for testbench and for the implementation of the filter in VHDL
+- DE1-SoC board : used to test the effect of the digital filter on songs playback
 - Audacity : used to analize filtered signal spectre

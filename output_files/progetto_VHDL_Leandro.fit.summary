@@ -1,0 +1,20 @@
+Fitter Status : Successful - Thu Jan 19 14:36:09 2023
+Quartus Prime Version : 21.1.1 Build 850 06/23/2022 SJ Lite Edition
+Revision Name : progetto_VHDL_Leandro
+Top-level Entity Name : progetto_VHDL_Leandro
+Family : Cyclone V
+Device : 5CSEMA5F31C6
+Timing Models : Final
+Logic utilization (in ALMs) : 1,616 / 32,070 ( 5 % )
+Total registers : 1436
+Total pins : 28 / 457 ( 6 % )
+Total virtual pins : 0
+Total block memory bits : 12,288 / 4,065,280 ( < 1 % )
+Total RAM Blocks : 4 / 397 ( 1 % )
+Total DSP Blocks : 32 / 87 ( 37 % )
+Total HSSI RX PCSs : 0
+Total HSSI PMA RX Deserializers : 0
+Total HSSI TX PCSs : 0
+Total HSSI PMA TX Serializers : 0
+Total PLLs : 1 / 6 ( 17 % )
+Total DLLs : 0 / 4 ( 0 % )

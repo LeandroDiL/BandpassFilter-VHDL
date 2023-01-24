@@ -1,0 +1,193 @@
+library ieee ;
+    use ieee.std_logic_1164.all ;
+    use ieee.std_logic_unsigned.all ;
+
+entity volume_selector is
+  port (
+    SIGNAL Data_In_L, Data_In_R             : IN STD_LOGIC_VECTOR(23 downto 0);
+    SIGNAL key2, key1, clock, reset                : IN STD_LOGIC;
+    SIGNAL Data_out_Left, Data_out_Right    : OUT STD_LOGIC_VECTOR(23 downto 0);
+    SIGNAL HEX0, HEX1                       : OUT STD_LOGIC_VECTOR(0 to 6)
+  );
+end volume_selector ; 
+
+architecture arch of volume_selector is
+    TYPE Volume_Value IS (zero, p12, p9, p6, p3, m3, m6, m9, m12);
+    SIGNAL Current_vol : Volume_Value := zero;
+    
+    SIGNAL Data_In_L_x4, Data_In_L_x2, Data_In_L_shift1, Data_In_L_shift2, Data_In_L_shift5, Data_In_L_shift6, Data_In_L_shift8 : STD_LOGIC_VECTOR(23 downto 0); -- Per i valori +12, +6, 0, -6 e -12 mi limito a dividere il segnale in ingresso per 2, 4, 8 e 16.
+    SIGNAL Data_frac_rad2_L_x4, Data_frac_rad2_L_x2, Data_frac_rad2_L, Data_frac_rad2_L_shift1                                  : STD_LOGIC_VECTOR(23 downto 0); -- Per i valori +9, +3, -3 e -9 invece calcolo una buona approssimazione di sqrt(2)/2 e poi divido quella per 2, 4 e 8.
+    
+    SIGNAL Data_In_R_x4, Data_In_R_x2, Data_In_R_shift1, Data_In_R_shift2, Data_In_R_shift5, Data_In_R_shift6, Data_In_R_shift8 : STD_LOGIC_VECTOR(23 downto 0);
+    SIGNAL Data_frac_rad2_R_x4, Data_frac_rad2_R_x2, Data_frac_rad2_R, Data_frac_rad2_R_shift1                                  : STD_LOGIC_VECTOR(23 downto 0);
+
+begin
+    -- Per approssimare sqrt(2)/2 faccio 1/2 + 1/4 = 0,75, pari a circa -2,5dB
+    
+    
+    Data_In_L_x4      <= Data_In_L(23)&Data_In_L(20 downto 0)&"00";
+    Data_In_L_x2      <= Data_In_L(23)&Data_In_L(21 downto 0)&'0';
+    Data_In_L_shift1  <= Data_In_L(23)&Data_In_L(23)&Data_In_L(22 downto 1);
+    Data_In_L_shift2  <= Data_In_L(23)&Data_In_L(23)&Data_In_L(23)&Data_In_L(22 downto 2);
+    
+    Data_frac_rad2_L <= Data_In_L_shift1 + Data_In_L_shift2; -- Qui calcolo l'approssimazione di sqrt(2)/2
+    
+    Data_frac_rad2_L_shift1 <= Data_frac_rad2_L(23)&Data_frac_rad2_L(23)&Data_frac_rad2_L(22 downto 1);     -- Divido per due
+    Data_frac_rad2_L_x2     <= Data_frac_rad2_L(23)&Data_frac_rad2_L(21 downto 0)&'0';                      -- Moltiplico per 2
+    Data_frac_rad2_L_x4     <= Data_frac_rad2_L(23)&Data_frac_rad2_L(20 downto 0)&"00";                     -- E per 4
+    
+    
+    --Stesso discorso per il segnale di destra
+    Data_In_R_x4      <= Data_In_R(23)&Data_In_R(20 downto 0)&"00";
+    Data_In_R_x2      <= Data_In_R(23)&Data_In_R(21 downto 0)&'0';
+    Data_In_R_shift1  <= Data_In_R(23)&Data_In_R(23)&Data_In_R(22 downto 1);
+    Data_In_R_shift2  <= Data_In_R(23)&Data_In_R(23)&Data_In_R(23)&Data_In_R(22 downto 2);
+    
+    Data_frac_rad2_R <= Data_In_R_shift1 + Data_In_R_shift2 ;
+    
+    Data_frac_rad2_R_shift1 <= Data_frac_rad2_R(23)&Data_frac_rad2_R(23)&Data_frac_rad2_R(22 downto 1);
+    Data_frac_rad2_R_x2     <= Data_frac_rad2_R(23)&Data_frac_rad2_R(21 downto 0)&'0';
+    Data_frac_rad2_R_x4     <= Data_frac_rad2_R(23)&Data_frac_rad2_R(20 downto 0)&"00";
+    
+    
+    PROCESS (clock) IS -- Tabella degli stati, determiniamo lo stato successivo in base allo stato attuale
+            variable Next_vol :  Volume_Value := zero;
+            VARIABLE vol_up, vol_dn, rel1, rel2 : STD_LOGIC := '0';
+        BEGIN
+            IF rising_edge(clock) then
+					case (reset) is
+						when '1' => Next_vol := zero;
+						when '0' =>
+						 IF (NOT(key2) AND rel2) = '1' then -- rel è 1 se il pulsante è stato rilasciato dopo essere stato premuto
+							  rel2 := '0';
+							  vol_up := '1';
+						 ELSIF (NOT(key1) AND rel1) = '1' then
+							  rel1 := '0';
+							  vol_dn := '1';
+						 ELSIF (key2 AND NOT(rel2)) = '1' then
+							  rel2 := '1'; -- Se il tasto è stato rilasciato possiamo mettere a 1 rel
+						 ELSIF key1 = '1' then
+							  rel1 := '1'; -- Se il tasto è stato rilasciato possiamo mettere a 1 rel
+						 END IF;
+					END CASE;
+           
+                case Current_vol is
+                    WHEN p12 =>
+                        HEX0 <= "1001100"; -- 4
+                        HEX1 <= "1111111";
+                        IF vol_up = '1' THEN
+                            Next_vol := p12;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := p9;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN p9 =>
+                        HEX0 <= "0000110"; -- 3
+                        HEX1 <= "1111111";
+                        IF vol_up = '1' THEN 
+                            Next_vol := p12;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := p6;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN p6 =>
+                        HEX0 <= "0010010"; -- 2
+                        HEX1 <= "1111111";
+                        IF vol_up = '1' THEN 
+                            Next_vol := p9;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := p3;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN p3 =>
+                        HEX0 <= "1001111"; -- 1
+                        HEX1 <= "1111111";
+                        IF vol_up = '1' THEN 
+                            Next_vol := p6;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := zero;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN zero =>
+                        HEX0 <= "0000001"; -- 0
+                        HEX1 <= "1111111";
+                        IF vol_up = '1' THEN 
+                            Next_vol := p3;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := m3;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN m3 =>
+                        HEX0 <= "1001111"; -- 1
+                        HEX1 <= "1111110";
+                        IF vol_up = '1' THEN 
+                            Next_vol := zero;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := m6;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN m6 =>
+                        HEX0 <= "0010010"; -- 2
+                        HEX1 <= "1111110";
+                        IF vol_up = '1' THEN 
+                            Next_vol := m3;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := m9;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN m9 =>
+                        HEX0 <= "0000110"; -- 3
+                        HEX1 <= "1111110";
+                        IF vol_up = '1' THEN 
+                            Next_vol := m6;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := m12;
+                            vol_dn := '0';
+                        END IF;
+                    WHEN m12 =>
+                        HEX0 <= "1001100"; -- 4
+                        HEX1 <= "1111110";
+                        IF vol_up = '1' THEN 
+                            Next_vol := m9;
+                            vol_up := '0';
+                        ELSIF vol_dn = '1' THEN
+                            Next_vol := m12;
+                            vol_dn := '0';
+                        END IF;
+                END CASE;
+                Current_vol <= next_vol; -- Cambio il volume secondo la tabella degli stati qui sopra.
+            END IF;
+        END PROCESS;
+        
+        with Current_vol select Data_out_Left <=
+        
+            Data_In_L_x4            when p12,
+            Data_frac_rad2_L_x4     when p9,
+            Data_In_L_x2            when p6,
+            Data_frac_rad2_L_x2     when p3,
+            Data_In_L               when zero,
+            Data_frac_rad2_L        when m3,
+            Data_In_L_shift1        when m6,
+            Data_frac_rad2_L_shift1 when m9,
+            Data_In_L_shift2        when m12;
+        
+        with Current_vol select Data_out_Right <=
+        
+            Data_In_R_x4            when p12,
+            Data_frac_rad2_R_x4     when p9,
+            Data_In_R_x2            when p6,
+            Data_frac_rad2_R_x2     when p3,
+            Data_In_R               when zero,
+            Data_frac_rad2_R        when m3,
+            Data_In_R_shift1        when m6,
+            Data_frac_rad2_R_shift1 when m9,
+            Data_In_R_shift2        when m12;
+end architecture ;

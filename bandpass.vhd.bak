@@ -1,0 +1,67 @@
+library ieee ;
+    use ieee.std_logic_1164.all ;
+    use ieee.numeric_std.all ;
+    use ieee.std_logic_unsigned.all;
+    
+entity bandpass is
+  port (
+    Data_In : IN std_logic_vector(23 downto 0)  := (others => '0');
+    clock, read_s                               : IN std_logic := '0';
+    Data_out                                    : OUT std_logic_vector(23 downto 0)
+  );
+end bandpass ; 
+
+architecture arch of bandpass is
+CONSTANT zero : STD_LOGIC_VECTOR(45 downto 0) := (others => '0');
+SIGNAL Compl : STD_LOGIC_VECTOR(45 downto 24) := (others => '0');
+SIGNAL s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12, s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24, s25 : STD_LOGIC_VECTOR(45 downto 0);
+begin
+    
+    Compl <= (others => Data_In(23));
+    -- Attraverso simulazioni in Simulink ho visto che alcuni segnali (in particolare s6 e s7) possono arrivare anche fino al valore di 2E+13 (nel caso di una sinusoide a 105Hz di ampiezza 8E6)
+    -- Ma anche in altri casi è molto difficile che il valore di molti dei segnali riesca ad essere rappresentato con 23(+1 di segno) bit. 45(+1) bit permettono di rappresentare valori compresi 
+    -- tra (-3,2)E13 e 3,2E13. In realtà non è necessario impiegare 45 bit per tutti i segnali, ma per semplicità ho fatto così.
+    
+    
+    -- Segnali del ramo superiore:
+    negk6 : entity work.multiply05367_and_add port map (not(s17), Compl&Data_In, s1);
+    negk5 : entity work.multiply08889_and_add port map (s15, s1, s2);
+    negk4 : entity work.multiply09168_and_add port map (not(s13), s2, s3);
+    negk3 : entity work.multiply09908_and_add port map (s11, s3, s4);
+    negk2 : entity work.multiply09998_and_add port map (not(s9), s4, s5);
+    negk1 : entity work.multiply09999_and_add port map (s7, s5, s6);
+    
+    -- Nota: Siccome i segnali del ramo superiore vanno moltiplicati per k e quelli ritardati vanno moltiplicati per -k, 
+    -- per impiegare le stesse entità ho pensato, invece di fare s1*(-0,5367), di fare (-s1)*0,5367 (eccetera).
+    -- Naturalmente il procedimento corretto per passare da s1 a -s1 è fare NOT(s1) + 1. 
+    -- Tuttavia, siccome il segnale è rappresentato da 24 bit, l'errore introdotto da questa approssimazione è assolutamente trascurabile.	 
+	 
+    reg_s7  : entity work.register_2x24bit port map (s6, clock, read_s, s7);
+    reg_s9  : entity work.register_2x24bit port map (s8, clock, read_s, s9);
+    reg_s11 : entity work.register_2x24bit port map (s10, clock, read_s, s11);
+    reg_s13 : entity work.register_2x24bit port map (s12, clock, read_s, s13);
+    reg_s15 : entity work.register_2x24bit port map (s14, clock, read_s, s15);
+    reg_s17 : entity work.register_2x24bit port map (s16, clock, read_s, s17);
+    
+    -- Segnali del ramo centrale (da destra verso sinistra)
+    k1 : entity work.multiply09999_and_add port map (not(s6), s7, s8);
+    k2 : entity work.multiply09998_and_add port map (s5, s9, s10);
+    k3 : entity work.multiply09908_and_add port map (not(s4), s11, s12);
+    k4 : entity work.multiply09168_and_add port map (s3, s13, s14);
+    k5 : entity work.multiply08889_and_add port map (not(s2), s15, s16);
+    k6 : entity work.multiply05367_and_add port map (s1, s17, s18);
+    
+    -- Segnali del ramo inferiore
+    v7 : entity work.multiply00231_and_add port map (not(s18), zero, s19);
+    v6 : entity work.multiply00638_and_add port map (not(s16), s19, s20);
+    v5 : entity work.multiply00806_and_add port map (not(s14), s20, s21);
+    v4 : entity work.multiply00510_and_add port map (not(s12), s21, s22);
+    v3 : entity work.multiply00022_and_add port map (s10, s22, s23);
+    v2 : entity work.multiply000042_and_add port map (s8, s23, s24);
+    v1 : entity work.multiply000000003432_and_add port map(not(s6), s24, s25);
+    
+    -- Uscita
+    Data_out <= s25(45)&s25(22 downto 0);
+    
+    
+end architecture ; 
